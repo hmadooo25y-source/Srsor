@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>مغامرة الصرصور للحروف</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#ff7a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+/* Layout: one centered play stage. Top: score and language tabs. Middle: target letter and three picture cards.
+   Bottom: a track of letters the cockroach can walk over and read aloud. */
+:root {
+  --bg: #fff6e0;
+  --ink: #3b2a1a;
+  --accent: #ff7a1a;
+  --accent-soft: #ffe0c2;
+  --ok: #22b35e;
+  --bad: #e5484d;
+  --card: #ffffff;
+  --track: #ffeab8;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: 'Baloo 2', Tahoma, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font-size: 16px;
+}
+.app { max-width: 520px; margin: 0 auto; min-width: 0; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+h1 {
+  font-family: 'Baloo Bhaijaan 2', Tahoma, sans-serif;
+  font-size: 1.6rem; margin: 0; text-wrap: balance; color: var(--ink);
+}
+.score {
+  background: var(--card); border-radius: 999px; padding: 6px 14px;
+  font-weight: 800; font-size: 1.1rem; box-shadow: 0 2px 0 #00000014;
+}
+.tabs { display: flex; gap: 8px; margin-top: 12px; }
+.tab {
+  flex: 1; font: inherit; font-weight: 800; font-size: 1.05rem; padding: 10px;
+  border: 3px solid var(--accent); background: var(--card); color: var(--ink);
+  border-radius: 14px; cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--accent); color: #fff; }
+.tab:focus-visible, .card:focus-visible, .tile:focus-visible, button:focus-visible {
+  outline: 3px solid #2563eb; outline-offset: 2px;
+}
+
+.stage {
+  position: relative; margin-top: 16px; background: var(--card);
+  border-radius: 24px; padding: 18px 14px 20px; min-height: 420px;
+  box-shadow: 0 6px 0 #00000012; min-width: 0;
+}
+.prompt { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.target {
+  font-family: 'Baloo Bhaijaan 2', Tahoma, sans-serif; font-weight: 800;
+  font-size: 6rem; line-height: 1; color: var(--accent); min-width: 1.2em; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.speak {
+  font: inherit; font-size: 1.6rem; width: 56px; height: 56px; border-radius: 50%;
+  border: none; background: var(--accent-soft); cursor: pointer;
+}
+
+.cards {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 18px;
+}
+.card {
+  font: inherit; background: var(--card); border: 3px solid var(--accent-soft);
+  border-radius: 18px; padding: 12px 6px; cursor: pointer; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: transform .15s ease, border-color .2s;
+}
+.card:active { transform: scale(.96); }
+.card .pic { font-size: 2.6rem; line-height: 1; }
+.card .word { font-weight: 800; font-size: 1.1rem; overflow-wrap: anywhere; }
+.card.correct { border-color: var(--ok); background: #e9fbef; }
+.card.wrong { border-color: var(--bad); background: #fdecec; }
+
+.msg {
+  min-height: 2.2em; margin: 14px 0 0; text-align: center;
+  font-weight: 800; font-size: 1.3rem; color: var(--ink);
+}
+.msg .again {
+  font: inherit; font-weight: 800; margin-top: 8px; padding: 10px 22px; border: none;
+  border-radius: 14px; background: var(--ok); color: #fff; cursor: pointer;
+}
+
+.track {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px;
+  margin-top: 16px; padding: 12px; background: var(--track); border-radius: 18px;
+}
+.tile {
+  font: inherit; font-weight: 800; font-size: 1.5rem; height: 52px; min-width: 0;
+  background: var(--card); border: none; border-radius: 12px; cursor: pointer;
+  font-family: 'Baloo Bhaijaan 2', Tahoma, sans-serif;
+}
+.tile:active { transform: scale(.92); }
+
+.bug {
+  position: absolute; width: 80px; height: 67px; z-index: 5; pointer-events: none;
+  left: 8px; top: 0;
+  transition: left .8s ease-in-out, top .8s ease-in-out;
+}
+.bug svg { width: 100%; height: 100%; display: block; animation: bob .45s ease-in-out infinite alternate; }
+@keyframes bob { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+.bug.shake { animation: shake .5s; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+.modes { margin-top: 10px; }
+.modes .tab { font-size: .95rem; padding: 8px; }
+.card .pic.letter {
+  font-family: 'Baloo Bhaijaan 2', Tahoma, sans-serif; font-weight: 800;
+  font-size: 2.8rem; color: var(--accent);
+}
+
+.cards.memory { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mem { min-height: 96px; justify-content: center; }
+.mem .back { font-size: 2rem; font-weight: 800; color: var(--accent); }
+.mem .front { display: none; flex-direction: column; align-items: center; gap: 4px; }
+.mem.open .front { display: flex; }
+.mem.open .back { display: none; }
+.mem.done { border-color: var(--ok); background: #e9fbef; }
+.mem .word { font-size: .9rem; }
+
+.hint { text-align: center; font-size: .95rem; margin: 12px 0 0; opacity: .75; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bug, .bug svg { transition: none; animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>مغامرة الصرصور للحروف</h1>
+    <div class="score" id="score" aria-live="polite">⭐ 0</div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-lang="ar" aria-selected="true">العربية</button>
+    <button class="tab" role="tab" data-lang="en" aria-selected="false">English</button>
+  </div>
+
+  <div class="tabs modes" role="tablist" aria-label="نوع اللعبة">
+    <button class="tab" role="tab" data-mode="match" aria-selected="true">صورة ← حرف</button>
+    <button class="tab" role="tab" data-mode="first" aria-selected="false">ما أول حرف؟</button>
+    <button class="tab" role="tab" data-mode="memory" aria-selected="false">لعبة الذاكرة</button>
+  </div>
+
+  <section class="stage" id="stage">
+    <div class="prompt">
+      <div class="target" id="target" aria-live="polite">أ</div>
+      <button class="speak" id="speak" aria-label="استمع">🔊</button>
+    </div>
+
+    <div class="cards" id="cards"></div>
+    <p class="msg" id="msg" aria-live="polite"></p>
+
+    <div class="track" id="track"></div>
+    <p class="hint">اضغط على الحرف لتسمعه، أو اختر الصورة الصحيحة</p>
+
+    <div class="bug" id="bug" aria-hidden="true">
+      <svg viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#5a2e12" stroke-width="4" stroke-linecap="round" fill="none">
+          <path d="M45 62 L25 78 M50 70 L38 92 M70 70 L82 92 M78 62 L98 78"/>
+        </g>
+        <path d="M92 26 Q100 10 112 6 M98 26 Q108 14 118 18" stroke="#5a2e12" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <ellipse cx="58" cy="60" rx="40" ry="28" fill="#b5651d"/>
+        <path d="M58 33 L58 88" stroke="#8a4513" stroke-width="2" opacity=".5"/>
+        <circle cx="92" cy="40" r="18" fill="#c97b33"/>
+        <circle cx="97" cy="36" r="5" fill="#fff"/>
+        <circle cx="98" cy="36" r="2.5" fill="#222"/>
+        <circle cx="86" cy="48" r="3" fill="#ff8a8a" opacity=".7"/>
+        <path d="M88 50 Q94 55 101 50" stroke="#5a2e12" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </section>
+</div>
+
+<script>
+const DATA = {
+  ar: [
+    { l: 'أ', w: 'أسد', e: '🦁' }, { l: 'ب', w: 'بطة', e: '🦆' }, { l: 'ت', w: 'تفاحة', e: '🍎' },
+    { l: 'ج', w: 'جمل', e: '🐪' }, { l: 'د', w: 'دب', e: '🐻' }, { l: 'ر', w: 'رمان', e: '🍈' },
+    { l: 'س', w: 'سمكة', e: '🐟' }, { l: 'ش', w: 'شمس', e: '☀️' }, { l: 'ص', w: 'صاروخ', e: '🚀' },
+    { l: 'ع', w: 'عصفور', e: '🐦' }, { l: 'ق', w: 'قطة', e: '🐱' }, { l: 'ك', w: 'كرة', e: '⚽' },
+    { l: 'ل', w: 'ليمون', e: '🍋' }, { l: 'م', w: 'موز', e: '🍌' }, { l: 'ن', w: 'نجمة', e: '🌟' },
+    { l: 'و', w: 'وردة', e: '🌹' }, { l: 'ي', w: 'يد', e: '✋' },
+    { l: 'ث', w: 'ثعلب', e: '🦊' }, { l: 'ح', w: 'حصان', e: '🐴' }, { l: 'خ', w: 'خروف', e: '🐑' },
+    { l: 'ذ', w: 'ذئب', e: '🐺' }, { l: 'ز', w: 'زرافة', e: '🦒' }, { l: 'ض', w: 'ضفدع', e: '🐸' },
+    { l: 'ط', w: 'طاووس', e: '🦚' }, { l: 'غ', w: 'غزال', e: '🦌' }, { l: 'ف', w: 'فراشة', e: '🦋' },
+    { l: 'ه', w: 'هليكوبتر', e: '🚁' }
+  ],
+  en: [
+    { l: 'A', w: 'Apple', e: '🍎' }, { l: 'B', w: 'Ball', e: '⚽' }, { l: 'C', w: 'Cat', e: '🐱' },
+    { l: 'D', w: 'Dog', e: '🐶' }, { l: 'E', w: 'Egg', e: '🥚' }, { l: 'F', w: 'Fish', e: '🐟' },
+    { l: 'G', w: 'Grapes', e: '🍇' }, { l: 'H', w: 'Hat', e: '🎩' }, { l: 'I', w: 'Ice cream', e: '🍦' },
+    { l: 'J', w: 'Juice', e: '🧃' }, { l: 'K', w: 'Kite', e: '🪁' }, { l: 'L', w: 'Lion', e: '🦁' },
+    { l: 'M', w: 'Moon', e: '🌙' }, { l: 'N', w: 'Nest', e: '🪹' }, { l: 'O', w: 'Orange', e: '🍊' },
+    { l: 'P', w: 'Penguin', e: '🐧' }, { l: 'Q', w: 'Queen', e: '👑' }, { l: 'R', w: 'Rainbow', e: '🌈' },
+    { l: 'S', w: 'Sun', e: '☀️' }, { l: 'T', w: 'Tree', e: '🌳' }, { l: 'U', w: 'Umbrella', e: '☂️' },
+    { l: 'V', w: 'Van', e: '🚐' }, { l: 'W', w: 'Watermelon', e: '🍉' }, { l: 'Y', w: 'Yo-yo', e: '🪀' },
+    { l: 'Z', w: 'Zebra', e: '🦓' }
+  ]
+};
+const LOCALE = { ar: 'ar-SA', en: 'en-US' };
+
+const $ = s => document.querySelector(s);
+const stage = $('#stage'), bug = $('#bug'), cards = $('#cards'), track = $('#track');
+const targetEl = $('#target'), msg = $('#msg'), scoreEl = $('#score');
+
+let lang = 'ar', mode = 'match', target = null, stars = 0, round = 0, busy = false;
+
+// Speaks the current target: the letter and word in "match" mode, only the word in "first" mode.
+function speakTarget() {
+  if (!target) return;
+  say(mode === 'first' ? target.w : target.l + ' ... ' + target.w);
+}
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function say(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = LOCALE[lang];
+    u.rate = 0.8;
+    speechSynthesis.speak(u);
+  } catch (err) { /* speech unavailable: the page still works */ }
+}
+
+function moveBug(el) {
+  const s = stage.getBoundingClientRect(), r = el.getBoundingClientRect();
+  bug.style.left = (r.left - s.left + r.width / 2 - 40) + 'px';
+  bug.style.top = (r.top - s.top - 62) + 'px';
+}
+
+function buildTrack() {
+  track.innerHTML = '';
+  DATA[lang].forEach(item => {
+    const b = document.createElement('button');
+    b.className = 'tile';
+    b.textContent = item.l;
+    b.onclick = () => {
+      if (busy) return;
+      moveBug(b);
+      say(item.l + ' ... ' + item.w);
+    };
+    track.appendChild(b);
+  });
+}
+
+function newRound() {
+  if (mode === 'memory') { startMemory(); return; }
+  busy = false;
+  msg.textContent = '';
+  const pool = DATA[lang];
+  target = pool[Math.floor(Math.random() * pool.length)];
+  const others = shuffle(pool.filter(x => x !== target)).slice(0, 2);
+  const opts = shuffle([target, ...others]);
+  cards.innerHTML = '';
+  cards.classList.remove('memory');
+  if (mode === 'first') {
+    // Show the picture; the child picks the letter the word starts with.
+    targetEl.textContent = target.e;
+    msg.textContent = lang === 'ar' ? 'ما أول حرف في الكلمة؟' : 'What is the first letter?';
+    opts.forEach(opt => {
+      const b = document.createElement('button');
+      b.className = 'card';
+      b.innerHTML = '<span class="pic letter"></span>';
+      b.querySelector('.pic').textContent = opt.l;
+      b.onclick = () => answer(b, opt);
+      cards.appendChild(b);
+    });
+  } else {
+    // Show the letter; the child picks the matching picture.
+    targetEl.textContent = target.l;
+    opts.forEach(opt => {
+      const b = document.createElement('button');
+      b.className = 'card';
+      b.innerHTML = '<span class="pic">' + opt.e + '</span><span class="word"></span>';
+      b.querySelector('.word').textContent = opt.w;
+      b.onclick = () => answer(b, opt);
+      cards.appendChild(b);
+    });
+  }
+  setTimeout(speakTarget, 300);
+}
+
+function answer(btn, opt) {
+  if (busy) return;
+  if (opt === target) {
+    busy = true;
+    btn.classList.add('correct');
+    moveBug(btn);
+    stars++;
+    scoreEl.textContent = '⭐ ' + stars;
+    round++;
+    setTimeout(() => {
+      speakTarget();
+      msg.textContent = lang === 'ar' ? 'أحسنت!' : 'Great job!';
+    }, 700);
+    setTimeout(() => (round % 5 === 0 ? finish() : newRound()), 2400);
+  } else {
+    btn.classList.add('wrong');
+    bug.classList.remove('shake');
+    void bug.offsetWidth;
+    bug.classList.add('shake');
+    say(lang === 'ar' ? 'حاول مرة أخرى' : 'Try again');
+    msg.textContent = lang === 'ar' ? 'حاول مرة أخرى' : 'Try again';
+    setTimeout(() => btn.classList.remove('wrong'), 600);
+  }
+}
+
+function finish() {
+  cards.innerHTML = '';
+  targetEl.textContent = '🏆';
+  msg.textContent = lang === 'ar' ? 'رائع! جمعت ' + stars + ' نجمة' : 'Awesome! ' + stars + ' stars';
+  const b = document.createElement('button');
+  b.className = 'again';
+  b.textContent = lang === 'ar' ? 'جولة جديدة' : 'New round';
+  b.onclick = () => { round = 0; newRound(); };
+  msg.appendChild(b);
+}
+
+// Memory game: 6 letter/picture pairs shuffled face down. Flip two cards to find a match.
+let memFlipped = [], memMatched = 0, memLock = false;
+
+function startMemory() {
+  busy = false;
+  target = null;
+  memFlipped = [];
+  memMatched = 0;
+  memLock = false;
+  msg.textContent = lang === 'ar' ? 'اقلب بطاقتين لتجد الحرف وصورته' : 'Flip two cards to match a letter and its picture';
+  targetEl.textContent = '🧠';
+  cards.innerHTML = '';
+  cards.classList.add('memory');
+
+  const items = shuffle(DATA[lang].slice()).slice(0, 6);
+  const tiles = shuffle(items.flatMap((it, i) => [
+    { i, t: 'l', spoken: it.l + ' ... ' + it.w, letter: it.l },
+    { i, t: 'p', spoken: it.w, emoji: it.e, word: it.w }
+  ]));
+
+  tiles.forEach(tile => {
+    const b = document.createElement('button');
+    b.className = 'card mem';
+    const back = document.createElement('span');
+    back.className = 'back';
+    back.textContent = '?';
+    const front = document.createElement('span');
+    front.className = 'front';
+    if (tile.t === 'l') {
+      const p = document.createElement('span');
+      p.className = 'pic letter';
+      p.textContent = tile.letter;
+      front.appendChild(p);
+    } else {
+      const p = document.createElement('span');
+      p.className = 'pic';
+      p.textContent = tile.emoji;
+      const w = document.createElement('span');
+      w.className = 'word';
+      w.textContent = tile.word;
+      front.appendChild(p);
+      front.appendChild(w);
+    }
+    b.appendChild(back);
+    b.appendChild(front);
+    b.onclick = () => memFlip(b, tile);
+    cards.appendChild(b);
+  });
+}
+
+function memFlip(b, tile) {
+  if (memLock || b.classList.contains('open') || b.classList.contains('done')) return;
+  b.classList.add('open');
+  say(tile.spoken);
+  memFlipped.push({ b, tile });
+  if (memFlipped.length < 2) return;
+
+  memLock = true;
+  const [a, c] = memFlipped;
+  if (a.tile.i === c.tile.i && a.tile.t !== c.tile.t) {
+    a.b.classList.add('done');
+    c.b.classList.add('done');
+    stars++;
+    scoreEl.textContent = '⭐ ' + stars;
+    memMatched++;
+    memFlipped = [];
+    memLock = false;
+    if (memMatched === 6) setTimeout(finishMemory, 700);
+  } else {
+    setTimeout(() => {
+      a.b.classList.remove('open');
+      c.b.classList.remove('open');
+      memFlipped = [];
+      memLock = false;
+    }, 1000);
+  }
+}
+
+function finishMemory() {
+  cards.innerHTML = '';
+  targetEl.textContent = '🏆';
+  msg.textContent = lang === 'ar' ? 'أحسنت! وجدت كل الأزواج' : 'Well done! You found all the pairs';
+  const b = document.createElement('button');
+  b.className = 'again';
+  b.textContent = lang === 'ar' ? 'جولة جديدة' : 'New round';
+  b.onclick = () => startMemory();
+  msg.appendChild(b);
+}
+
+function setLang(l) {
+  lang = l;
+  document.documentElement.lang = LOCALE[l].slice(0, 2);
+  document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+  stage.dir = l === 'ar' ? 'rtl' : 'ltr';
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.lang === l)));
+  buildTrack();
+  newRound();
+  requestAnimationFrame(() => {
+    if (track.firstElementChild) moveBug(track.firstElementChild);
+  });
+}
+
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => setLang(b.dataset.lang));
+$('#speak').onclick = speakTarget;
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.modes .tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
+  newRound();
+}
+document.querySelectorAll('.modes .tab').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+setLang('ar');
+
+// Register the offline cache (works on GitHub Pages subfolders because paths are relative).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ });
+  });
+}
+</script>
+</body>
+</html>

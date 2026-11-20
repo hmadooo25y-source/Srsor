@@ -1,0 +1,17 @@
+{
+  "name": "مغامرة الصرصور للحروف",
+  "short_name": "الصرصور",
+  "description": "لعبة تعليم الحروف العربية والإنجليزية للأطفال",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff6e0",
+  "theme_color": "#ff7a1a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
